@@ -34,7 +34,7 @@ impl Pattern<'_> {
             let mut non_wildcards = false;
             let mut pos = self.pattern_pos;
             while pos < self.pattern.chars().count() && !non_wildcards {
-                if !['?', '*'].contains(&self.pattern.chars().nth(pos).unwrap()) {
+                if !['?'].contains(&self.pattern.chars().nth(pos).unwrap()) { //planned to be ['?', '*'].contains() but not requirement yet
                     non_wildcards = true;
                 }
                 pos += 1;
@@ -117,7 +117,7 @@ impl Pattern<'_> {
             }
             self.input_pos -= 1;
             return self.advance(input_line, match_end);
-        } else if pattern_c == input_c {
+        } else if pattern_c == input_c || pattern_c == '.' {
             println!("Match {}[{}] with {}[{}]", pattern_c, self.pattern_pos, input_c, self.input_pos);
             return self.advance(input_line, match_end);
         } else if pattern_c != input_c {
