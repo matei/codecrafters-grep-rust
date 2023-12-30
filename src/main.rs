@@ -78,8 +78,8 @@ impl Pattern<'_> {
                 panic!("Unterminated group sequence in {}", self.pattern);
             }
             let ic = input_line.chars().nth(self.input_pos).unwrap();
-            return if (is_negative_group && group.contains(ic)) || !group.contains(ic) {
-                println!("Position {} of input is not matching group {}", self.input_pos, group);
+            return if (is_negative_group && group.contains(ic)) || (!is_negative_group && !group.contains(ic)) {
+                println!("{}[{}] is not matching group {} - is_negative={}", ic, self.input_pos, group, is_negative_group);
                 false
             } else {
                 self.pattern_pos = closing_bracket as usize;
