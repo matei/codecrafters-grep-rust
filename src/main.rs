@@ -108,17 +108,28 @@ impl Pattern<'_> {
 
 fn match_pattern(input_line: &str, pattern_str: &str) -> bool {
     if pattern_str.chars().count() > 0 {
+        let mut match_start = false;
+        let mut final_pattern = pattern_str.to_string();
+        if pattern_str.chars().nth(0).unwrap() == '^' {
+            match_start = true;
+            final_pattern = final_pattern[1..].to_string();
+        }
+
         let mut pattern = Pattern {
-            pattern: pattern_str,
+            pattern: &final_pattern,
             pattern_pos: 0,
             input_pos: 0
         };
         let mut start = 0;
         let mut matched = false;
+
         while start < input_line.chars().count() && ! matched {
             let input = &input_line.to_string()[start..];
             println!("Trying to match string '{}' with pattern '{}'", input, pattern_str);
             matched = pattern.match_string(input);
+            if match_start {
+                return matched;
+            }
             start += 1;
         }
         return matched;
