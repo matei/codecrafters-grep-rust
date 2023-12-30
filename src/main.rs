@@ -31,9 +31,9 @@ impl Pattern<'_> {
         }
         if self.pattern.chars().nth(self.pattern_pos).unwrap() == '\\' {
             if self.pattern.chars().count() - 1 > self.pattern_pos {
+                let c = input_line.chars().nth(self.input_pos).unwrap();
                 match self.pattern.chars().nth(self.pattern_pos + 1).unwrap() {
                     'd' => {
-                        let c = input_line.chars().nth(self.input_pos).unwrap();
                         if c.is_digit(10) {
                             self.pattern_pos += 1;
                             println!("Match {} with \\d", c);
@@ -43,7 +43,6 @@ impl Pattern<'_> {
                         return false;
                     },
                     'w' => {
-                        let c = input_line.chars().nth(self.input_pos).unwrap();
                         if c.is_digit(10) || c.is_alphabetic() {
                             self.pattern_pos += 1;
                             println!("Match {} with \\w", c);
@@ -52,6 +51,14 @@ impl Pattern<'_> {
                         println!("Character at position {} ({}) is not a word", self.input_pos, c);
                         return false;
                     },
+                    '\\' => {
+                        if c != '\\' {
+                            return false;
+                        }
+                        println!("Match {} with \\", c);
+                        self.pattern_pos += 1;
+                        return self.advance(input_line);
+                    }
                     _ => {
                         panic!("Unhandled escape sequence \\{} in {}", self.pattern.chars().nth(self.pattern_pos + 1).unwrap(), self.pattern);
                     }
@@ -110,7 +117,7 @@ fn match_pattern(input_line: &str, pattern_str: &str) -> bool {
         let mut matched = false;
         while start < input_line.chars().count() && ! matched {
             let input = &input_line.to_string()[start..];
-            println!("Trying to match string {} with pattern {}", input, pattern_str);
+            println!("Trying to match string '{}' with pattern '{}'", input, pattern_str);
             matched = pattern.match_string(input);
             start += 1;
         }
