@@ -2,68 +2,116 @@ use std::env;
 use std::io;
 use std::process;
 
-fn decimal_matcher(input_line: &str) -> bool {
-    for c in input_line.chars() {
-        if c.is_digit(10) {
-            return true;
-        }
-    }
-    return false;
+struct Pattern<'a> {
+    pattern: &'a str,
+    pattern_pos: usize,
+    input_pos: usize
 }
 
-fn word_matcher(input_line: &str) -> bool {
-    for c in input_line.chars() {
-        if c.is_alphabetic() || c.is_digit(10) {
+impl Pattern<'_> {
+    fn advance(&mut self, input_line: &str) -> bool {
+        if self.pattern_pos >= self.pattern.chars().count() {
             return true;
         }
+        if self.input_pos >= input_line.len() {
+            return false;
+        }
+        self.pattern_pos += 1;
+        self.input_pos += 1;
+        return self.match_string(input_line);
     }
-    return false;
-}
 
-fn positive_char_group_matcher(input_line: &str, pattern: &str)  -> bool {
-    let group = &pattern[1..pattern.len()-1];
-    for gc in group.chars() {
-        if input_line.contains(gc) {
-            println!("{} is in {}", gc, input_line);
+    fn match_string(&mut self, input_line: &str) -> bool {
+        if self.pattern_pos >= self.pattern.chars().count() {
             return true;
         }
+        if self.input_pos == input_line.chars().count() && self.pattern_pos < self.pattern.chars().count() {
+            return false;
+        }
+        if self.pattern.chars().nth(self.pattern_pos).unwrap() == '\\' {
+            if self.pattern.chars().count() - 1 > self.pattern_pos {
+                match self.pattern.chars().nth(self.pattern_pos + 1).unwrap() {
+                    'd' => {
+                        let c = input_line.chars().nth(self.input_pos).unwrap();
+                        if c.is_digit(10) {
+                            self.pattern_pos += 1;
+                            println!("Match {} with \\d", c);
+                            return self.advance(input_line);
+                        }
+                        println!("Character at position {} ({}) is not a digit", self.input_pos, c);
+                        return false;
+                    },
+                    'w' => {
+                        let c = input_line.chars().nth(self.input_pos).unwrap();
+                        if c.is_digit(10) || c.is_alphabetic() {
+                            self.pattern_pos += 1;
+                            println!("Match {} with \\w", c);
+                            return self.advance(input_line);
+                        }
+                        println!("Character at position {} ({}) is not a word", self.input_pos, c);
+                        return false;
+                    },
+                    _ => {
+                        panic!("Unhandled escape sequence \\{} in {}", self.pattern.chars().nth(self.pattern_pos + 1).unwrap(), self.pattern);
+                    }
+                }
+            } else {
+                panic!("Unterminated escape sequence: {}", self.pattern);
+            }
+        } else if self.pattern.chars().nth(self.pattern_pos).unwrap() == '[' {
+            if self.input_pos >= input_line.chars().count() - 1 {
+                println!("Position {} of input is beyond bounds, there is no place to match the starting group", self.input_pos);
+                return false;
+            }
+            let mut group = String::new();
+            let mut closing_bracket = -1;
+            let mut is_negative_group = false;
+            let mut pos = self.pattern_pos + 1;
+            while pos < self.pattern.chars().count() && closing_bracket == -1 {
+                let gc = self.pattern.chars().nth(pos).unwrap();
+                if gc == ']' {
+                    closing_bracket = pos as i32;
+                } else if pos == self.pattern_pos + 1 && gc == '^' {
+                    is_negative_group = true;
+                } else {
+                    group.push(gc);
+                }
+                pos += 1;
+            }
+            if closing_bracket == -1 {
+                panic!("Unterminated group sequence in {}", self.pattern);
+            }
+            let ic = input_line.chars().nth(self.input_pos).unwrap();
+            return if (is_negative_group && group.contains(ic)) || !group.contains(ic) {
+                println!("Position {} of input is not matching group {}", self.input_pos, group);
+                false
+            } else {
+                self.pattern_pos = closing_bracket as usize;
+                self.advance(input_line)
+            }
+        } else if self.pattern.chars().nth(self.pattern_pos).unwrap() == input_line.chars().nth(self.input_pos).unwrap() {
+            println!("Match {}[{}] with {}[{}]", self.pattern.chars().nth(self.pattern_pos).unwrap(), self.pattern_pos, input_line.chars().nth(self.input_pos).unwrap(), self.input_pos);
+            return self.advance(input_line);
+        } else if self.pattern.chars().nth(self.pattern_pos).unwrap() != input_line.chars().nth(self.input_pos).unwrap() {
+            println!("No match {}[{}] with {}[{}]", self.pattern.chars().nth(self.pattern_pos).unwrap(), self.pattern_pos, input_line.chars().nth(self.input_pos).unwrap(), self.input_pos);
+            return false;
+        }
+        //if we reached here, it's the end of the line and there was no return false so it's a match
+        println!("Reached end, input_pos={} pattern_pos={}", self.input_pos, self.pattern_pos);
+        return true;
     }
-    return false;
 }
 
-fn negative_char_group_matcher(input_line: &str, pattern: &str)  -> bool {
-    let group = &pattern[2..pattern.len()-1];
-    for c in input_line.trim().chars() {
-        if !group.contains(c) {
-            println!("{} is not in {}", c, group);
-            return true;
-        }
-    }
-    return false;
-}
-
-fn match_pattern(input_line: &str, pattern: &str) -> bool {
-    if pattern.chars().count() > 0 {
-        if pattern == "\\d" {
-            println!("Decimal matcher");
-            return decimal_matcher(input_line);
-        }
-        else if pattern == "\\w" {
-            println!("word matcher");
-            return word_matcher(input_line);
-        }
-        else if pattern.starts_with("[^") && pattern.ends_with("]") {
-            println!("Negative char group matcher");
-            return negative_char_group_matcher(input_line, pattern);
-        }
-        else if pattern.starts_with("[") && pattern.ends_with("]") {
-            println!("Positive char group matcher");
-            return positive_char_group_matcher(input_line, pattern);
-        }
-        println!("generic matcher");
-        return input_line.contains(pattern);
+fn match_pattern(input_line: &str, pattern_str: &str) -> bool {
+    if pattern_str.chars().count() > 0 {
+        let mut pattern = Pattern {
+            pattern: pattern_str,
+            pattern_pos: 0,
+            input_pos: 0
+        };
+        return pattern.match_string(input_line);
     } else {
-        panic!("Unhandled pattern: {}", pattern)
+        panic!("Unhandled pattern: {}", pattern_str);
     }
 }
 
@@ -77,12 +125,13 @@ fn main() {
         process::exit(1);
     }
 
-    let pattern = env::args().nth(2).unwrap();
+    let pattern = String::from(env::args().nth(2).unwrap().trim());
+    println!("pattern length: {}", pattern.chars().count());
     let mut input_line = String::new();
 
     io::stdin().read_line(&mut input_line).unwrap();
 
-    if match_pattern(&input_line, &pattern) {
+    if match_pattern(&input_line.trim(), &pattern) {
         println!("Match!");
         process::exit(0)
     } else {
