@@ -21,8 +21,14 @@ impl Pattern<'_> {
         return self.match_string(input_line, match_end);
     }
 
+    fn reset(&mut self) {
+        self.input_pos = 0;
+        self.pattern_pos = 0;
+    }
+
     fn match_string(&mut self, input_line: &str, match_end: bool) -> bool {
-        if self.pattern_pos >= self.pattern.chars().count() {
+        //check for $ condition
+        if self.pattern_pos >= self.pattern.chars().count() - 1 {
             return if match_end && self.input_pos < input_line.chars().count() - 1 {
                 false
             } else {
@@ -134,6 +140,7 @@ fn match_pattern(input_line: &str, pattern_str: &str) -> bool {
 
         while start < input_line.chars().count() && ! matched {
             let input = &input_line.to_string()[start..];
+            pattern.reset();
             println!("Trying to match string '{}' with pattern '{}'", input, pattern_str);
             matched = pattern.match_string(input, match_end);
             if match_start {
