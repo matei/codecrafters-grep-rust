@@ -12,6 +12,13 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
             }
             return false;
         }
+        else if pattern == "\\w" {
+            for c in input_line.chars() {
+                if c.is_digit(10) || c.is_alphabetic() {
+                    return true;
+                }
+            }
+        }
         return input_line.contains(pattern);
     } else {
         panic!("Unhandled pattern: {}", pattern)
