@@ -25,7 +25,7 @@ impl Pattern<'_> {
         if self.pattern_pos >= self.pattern.chars().count() {
             return true;
         }
-        if self.input_pos == input_line.chars().count() && self.pattern_pos < self.pattern.chars().count() {
+        if self.input_pos >= input_line.chars().count() - 1 && self.pattern_pos < self.pattern.chars().count() {
             return false;
         }
         if self.pattern.chars().nth(self.pattern_pos).unwrap() == '\\' {
@@ -109,6 +109,7 @@ fn match_pattern(input_line: &str, pattern_str: &str) -> bool {
         let mut matched = false;
         while start < input_line.chars().count() && ! matched {
             let input = &input_line.to_string()[start..];
+            println!("Trying to match string {} with pattern {}", input, pattern_str);
             matched = pattern.match_string(input);
             start += 1;
         }
