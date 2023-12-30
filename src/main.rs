@@ -31,6 +31,17 @@ fn positive_char_group_matcher(input_line: &str, pattern: &str)  -> bool {
     return false;
 }
 
+fn negative_char_group_matcher(input_line: &str, pattern: &str)  -> bool {
+    let group = &pattern[2..pattern.len()-1];
+    for c in input_line.trim().chars() {
+        if !group.contains(c) {
+            println!("{} is not in {}", c, group);
+            return true;
+        }
+    }
+    return false;
+}
+
 fn match_pattern(input_line: &str, pattern: &str) -> bool {
     if pattern.chars().count() > 0 {
         if pattern == "\\d" {
@@ -40,6 +51,10 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
         else if pattern == "\\w" {
             println!("word matcher");
             return word_matcher(input_line);
+        }
+        else if pattern.starts_with("[^") && pattern.ends_with("]") {
+            println!("Negative char group matcher");
+            return negative_char_group_matcher(input_line, pattern);
         }
         else if pattern.starts_with("[") && pattern.ends_with("]") {
             println!("Positive char group matcher");
