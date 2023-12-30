@@ -2,23 +2,50 @@ use std::env;
 use std::io;
 use std::process;
 
+fn decimal_matcher(input_line: &str) -> bool {
+    for c in input_line.chars() {
+        if c.is_digit(10) {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn word_matcher(input_line: &str) -> bool {
+    for c in input_line.chars() {
+        if c.is_alphabetic() || c.is_digit(10) {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn positive_char_group_matcher(input_line: &str, pattern: &str)  -> bool {
+    let group = &pattern[1..input_line.len()-1];
+    for gc in group.chars() {
+        if input_line.contains(gc) {
+            println!("{} is in {}", gc, input_line);
+            return true;
+        }
+    }
+    return false;
+}
+
 fn match_pattern(input_line: &str, pattern: &str) -> bool {
     if pattern.chars().count() > 0 {
         if pattern == "\\d" {
-            for c in input_line.chars() {
-                if c.is_digit(10) {
-                    return true;
-                }
-            }
-            return false;
+            println!("Decimal matcher");
+            return decimal_matcher(input_line);
         }
         else if pattern == "\\w" {
-            for c in input_line.chars() {
-                if c.is_digit(10) || c.is_alphabetic() {
-                    return true;
-                }
-            }
+            println!("word matcher");
+            return word_matcher(input_line);
         }
+        else if pattern.starts_with("[") && pattern.ends_with("]") {
+            println!("Positive char group matcher");
+            return positive_char_group_matcher(input_line, pattern);
+        }
+        println!("generic matcher");
         return input_line.contains(pattern);
     } else {
         panic!("Unhandled pattern: {}", pattern)
@@ -41,8 +68,10 @@ fn main() {
     io::stdin().read_line(&mut input_line).unwrap();
 
     if match_pattern(&input_line, &pattern) {
+        println!("Match!");
         process::exit(0)
     } else {
+        println!("No match");
         process::exit(1)
     }
 }
