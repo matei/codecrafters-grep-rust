@@ -30,36 +30,48 @@ impl Pattern<'_> {
             return true;
         }
         if self.input_pos >= input_line.chars().count() && self.pattern_pos < self.pattern.chars().count() {
-            println!("Reached end of input and not end of pattern");
-            return false;
+            //edge case: if last parts of pattern are just "*" or "?" then it's match
+            let mut non_wildcards = false;
+            let mut pos = self.pattern_pos;
+            while pos < self.pattern.chars().count() && !non_wildcards {
+                if !['?', '*'].contains(&self.pattern.chars().nth(pos).unwrap()) {
+                    non_wildcards = true;
+                }
+                pos += 1;
+            }
+            println!("Reached end of input and not end of pattern. Remaining all wildcards: {}", !non_wildcards);
+            return !non_wildcards;
         }
-        if self.pattern.chars().nth(self.pattern_pos).unwrap() == '\\' {
+
+        let pattern_c = self.pattern.chars().nth(self.pattern_pos).unwrap();
+        let input_c = input_line.chars().nth(self.input_pos).unwrap();
+
+        if pattern_c == '\\' {
             if self.pattern.chars().count() - 1 > self.pattern_pos {
-                let c = input_line.chars().nth(self.input_pos).unwrap();
                 match self.pattern.chars().nth(self.pattern_pos + 1).unwrap() {
                     'd' => {
-                        if c.is_digit(10) {
+                        if input_c.is_digit(10) {
                             self.pattern_pos += 1;
-                            println!("Match {} with \\d", c);
+                            println!("Match {} with \\d", input_c);
                             return self.advance(input_line, match_end);
                         }
-                        println!("Character at position {} ({}) is not a digit", self.input_pos, c);
+                        println!("Character at position {} ({}) is not a digit", self.input_pos, input_c);
                         return false;
                     },
                     'w' => {
-                        if c.is_digit(10) || c.is_alphabetic() {
+                        if input_c.is_digit(10) || input_c.is_alphabetic() {
                             self.pattern_pos += 1;
-                            println!("Match {} with \\w", c);
+                            println!("Match {} with \\w", input_c);
                             return self.advance(input_line, match_end);
                         }
-                        println!("Character at position {} ({}) is not a word", self.input_pos, c);
+                        println!("Character at position {} ({}) is not a word", self.input_pos, input_c);
                         return false;
                     },
                     '\\' => {
-                        if c != '\\' {
+                        if input_c != '\\' {
                             return false;
                         }
-                        println!("Match {} with \\", c);
+                        println!("Match {} with \\", input_c);
                         self.pattern_pos += 1;
                         return self.advance(input_line, match_end);
                     }
@@ -70,7 +82,7 @@ impl Pattern<'_> {
             } else {
                 panic!("Unterminated escape sequence: {}", self.pattern);
             }
-        } else if self.pattern.chars().nth(self.pattern_pos).unwrap() == '[' {
+        } else if pattern_c == '[' {
             let mut group = String::new();
             let mut closing_bracket = -1;
             let mut is_negative_group = false;
@@ -89,29 +101,39 @@ impl Pattern<'_> {
             if closing_bracket == -1 {
                 panic!("Unterminated group sequence in {}", self.pattern);
             }
-            let ic = input_line.chars().nth(self.input_pos).unwrap();
-            return if (is_negative_group && group.contains(ic)) || (!is_negative_group && !group.contains(ic)) {
-                println!("{}[{}] is not matching group {} - is_negative={}", ic, self.input_pos, group, is_negative_group);
+            return if (is_negative_group && group.contains(input_c)) || (!is_negative_group && !group.contains(input_c)) {
+                println!("{}[{}] is not matching group {} - is_negative={}", input_c, self.input_pos, group, is_negative_group);
                 false
             } else {
                 self.pattern_pos = closing_bracket as usize;
                 self.advance(input_line, match_end)
             }
-        } else if self.pattern.chars().nth(self.pattern_pos).unwrap() == '+' {
+        } else if pattern_c == '+' {
             let prev_char = self.pattern.chars().nth(self.pattern_pos - 1).unwrap();
-            println!("+ detected, trying to match with {}", prev_char);
+            println!("+ detected, trying to match with {} input_pos is {}", prev_char, self.input_pos);
             while input_line.chars().nth(self.input_pos).unwrap() == prev_char && self.input_pos < input_line.chars().count() - 1 {
-                println!("next");
+                println!("next -> input_pos is {}", self.input_pos);
                 self.input_pos += 1;
             }
             self.input_pos -= 1;
             return self.advance(input_line, match_end);
-        } else if self.pattern.chars().nth(self.pattern_pos).unwrap() == input_line.chars().nth(self.input_pos).unwrap() {
-            println!("Match {}[{}] with {}[{}]", self.pattern.chars().nth(self.pattern_pos).unwrap(), self.pattern_pos, input_line.chars().nth(self.input_pos).unwrap(), self.input_pos);
+        } else if pattern_c == input_c {
+            println!("Match {}[{}] with {}[{}]", pattern_c, self.pattern_pos, input_c, self.input_pos);
             return self.advance(input_line, match_end);
-        } else if self.pattern.chars().nth(self.pattern_pos).unwrap() != input_line.chars().nth(self.input_pos).unwrap() {
-            println!("No match {}[{}] with {}[{}]", self.pattern.chars().nth(self.pattern_pos).unwrap(), self.pattern_pos, input_line.chars().nth(self.input_pos).unwrap(), self.input_pos);
-            return false;
+        } else if pattern_c != input_c {
+            if pattern_c == '?' {
+                //if we are here, the prev pattern char - the optional - was matched, so we just ignore and advance
+                return self.advance(input_line, match_end);
+            }
+            else if self.pattern_pos < self.pattern.chars().count() - 1 && self.pattern.chars().nth(self.pattern_pos + 1).unwrap() == '?' {
+                // for the case abc? -> abdv where the prev optional was not matched
+                self.pattern_pos += 1; //skip the unmatched optional char and the "?" but the additional increment is in advance
+                return self.advance(input_line, match_end);
+            }
+            else {
+                println!("No match {}[{}] with {}[{}]", self.pattern.chars().nth(self.pattern_pos).unwrap(), self.pattern_pos, input_line.chars().nth(self.input_pos).unwrap(), self.input_pos);
+                return false;
+            }
         }
         //if we reached here, it's the end of the line and there was no return false so it's a match
         println!("Reached end, input_pos={} pattern_pos={}", self.input_pos, self.pattern_pos);
