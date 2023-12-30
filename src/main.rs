@@ -25,7 +25,8 @@ impl Pattern<'_> {
         if self.pattern_pos >= self.pattern.chars().count() {
             return true;
         }
-        if self.input_pos >= input_line.chars().count() - 1 && self.pattern_pos < self.pattern.chars().count() {
+        if self.input_pos >= input_line.chars().count() && self.pattern_pos < self.pattern.chars().count() {
+            println!("Reached end of input and not end of matcher");
             return false;
         }
         if self.pattern.chars().nth(self.pattern_pos).unwrap() == '\\' {
