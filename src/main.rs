@@ -105,7 +105,14 @@ fn match_pattern(input_line: &str, pattern_str: &str) -> bool {
             pattern_pos: 0,
             input_pos: 0
         };
-        return pattern.match_string(input_line);
+        let mut start = 0;
+        let mut matched = false;
+        while start < input_line.chars().count() && ! matched {
+            let input = &input_line.to_string()[start..];
+            matched = pattern.match_string(input);
+            start += 1;
+        }
+        return matched;
     } else {
         panic!("Unhandled pattern: {}", pattern_str);
     }
