@@ -26,6 +26,9 @@ impl Pattern<'_> {
             return false;
         }
 
+        if self.pattern_pos >= self.pattern.chars().count() {
+            return true;
+        }
         if self.input_pos >= input_line.chars().count() && self.pattern_pos < self.pattern.chars().count() {
             println!("Reached end of input and not end of pattern");
             return false;
