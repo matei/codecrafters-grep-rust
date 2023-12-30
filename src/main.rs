@@ -9,7 +9,7 @@ struct Pattern<'a> {
 }
 
 impl Pattern<'_> {
-    fn advance(&mut self, input_line: &str) -> bool {
+    fn advance(&mut self, input_line: &str, match_end: bool) -> bool {
         if self.pattern_pos >= self.pattern.chars().count() {
             return true;
         }
@@ -18,12 +18,16 @@ impl Pattern<'_> {
         }
         self.pattern_pos += 1;
         self.input_pos += 1;
-        return self.match_string(input_line);
+        return self.match_string(input_line, match_end);
     }
 
-    fn match_string(&mut self, input_line: &str) -> bool {
+    fn match_string(&mut self, input_line: &str, match_end: bool) -> bool {
         if self.pattern_pos >= self.pattern.chars().count() {
-            return true;
+            return if match_end && self.input_pos < input_line.chars().count() - 1 {
+                false
+            } else {
+                true
+            }
         }
         if self.input_pos >= input_line.chars().count() && self.pattern_pos < self.pattern.chars().count() {
             println!("Reached end of input and not end of matcher");
@@ -37,7 +41,7 @@ impl Pattern<'_> {
                         if c.is_digit(10) {
                             self.pattern_pos += 1;
                             println!("Match {} with \\d", c);
-                            return self.advance(input_line);
+                            return self.advance(input_line, match_end);
                         }
                         println!("Character at position {} ({}) is not a digit", self.input_pos, c);
                         return false;
@@ -46,7 +50,7 @@ impl Pattern<'_> {
                         if c.is_digit(10) || c.is_alphabetic() {
                             self.pattern_pos += 1;
                             println!("Match {} with \\w", c);
-                            return self.advance(input_line);
+                            return self.advance(input_line, match_end);
                         }
                         println!("Character at position {} ({}) is not a word", self.input_pos, c);
                         return false;
@@ -57,7 +61,7 @@ impl Pattern<'_> {
                         }
                         println!("Match {} with \\", c);
                         self.pattern_pos += 1;
-                        return self.advance(input_line);
+                        return self.advance(input_line, match_end);
                     }
                     _ => {
                         panic!("Unhandled escape sequence \\{} in {}", self.pattern.chars().nth(self.pattern_pos + 1).unwrap(), self.pattern);
@@ -91,11 +95,11 @@ impl Pattern<'_> {
                 false
             } else {
                 self.pattern_pos = closing_bracket as usize;
-                self.advance(input_line)
+                self.advance(input_line, match_end)
             }
         } else if self.pattern.chars().nth(self.pattern_pos).unwrap() == input_line.chars().nth(self.input_pos).unwrap() {
             println!("Match {}[{}] with {}[{}]", self.pattern.chars().nth(self.pattern_pos).unwrap(), self.pattern_pos, input_line.chars().nth(self.input_pos).unwrap(), self.input_pos);
-            return self.advance(input_line);
+            return self.advance(input_line, match_end);
         } else if self.pattern.chars().nth(self.pattern_pos).unwrap() != input_line.chars().nth(self.input_pos).unwrap() {
             println!("No match {}[{}] with {}[{}]", self.pattern.chars().nth(self.pattern_pos).unwrap(), self.pattern_pos, input_line.chars().nth(self.input_pos).unwrap(), self.input_pos);
             return false;
@@ -109,10 +113,15 @@ impl Pattern<'_> {
 fn match_pattern(input_line: &str, pattern_str: &str) -> bool {
     if pattern_str.chars().count() > 0 {
         let mut match_start = false;
+        let mut match_end = false;
         let mut final_pattern = pattern_str.to_string();
         if pattern_str.chars().nth(0).unwrap() == '^' {
             match_start = true;
             final_pattern = final_pattern[1..].to_string();
+        }
+        if pattern_str.chars().last().unwrap() == '$' {
+            match_end = true;
+            final_pattern = final_pattern[..final_pattern.chars().count()-1].to_string();
         }
 
         let mut pattern = Pattern {
@@ -126,7 +135,7 @@ fn match_pattern(input_line: &str, pattern_str: &str) -> bool {
         while start < input_line.chars().count() && ! matched {
             let input = &input_line.to_string()[start..];
             println!("Trying to match string '{}' with pattern '{}'", input, pattern_str);
-            matched = pattern.match_string(input);
+            matched = pattern.match_string(input, match_end);
             if match_start {
                 return matched;
             }
