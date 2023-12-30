@@ -97,6 +97,15 @@ impl Pattern<'_> {
                 self.pattern_pos = closing_bracket as usize;
                 self.advance(input_line, match_end)
             }
+        } else if self.pattern.chars().nth(self.pattern_pos).unwrap() == '+' {
+            let prev_char = self.pattern.chars().nth(self.pattern_pos - 1).unwrap();
+            println!("+ detected, trying to match with {}", prev_char);
+            while input_line.chars().nth(self.input_pos).unwrap() == prev_char && self.input_pos < input_line.chars().count() - 1 {
+                println!("next");
+                self.input_pos += 1;
+            }
+            self.input_pos -= 1;
+            return self.advance(input_line, match_end);
         } else if self.pattern.chars().nth(self.pattern_pos).unwrap() == input_line.chars().nth(self.input_pos).unwrap() {
             println!("Match {}[{}] with {}[{}]", self.pattern.chars().nth(self.pattern_pos).unwrap(), self.pattern_pos, input_line.chars().nth(self.input_pos).unwrap(), self.input_pos);
             return self.advance(input_line, match_end);
