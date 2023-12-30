@@ -59,10 +59,6 @@ impl Pattern<'_> {
                 panic!("Unterminated escape sequence: {}", self.pattern);
             }
         } else if self.pattern.chars().nth(self.pattern_pos).unwrap() == '[' {
-            if self.input_pos >= input_line.chars().count() - 1 {
-                println!("Position {} of input is beyond bounds, there is no place to match the starting group", self.input_pos);
-                return false;
-            }
             let mut group = String::new();
             let mut closing_bracket = -1;
             let mut is_negative_group = false;
