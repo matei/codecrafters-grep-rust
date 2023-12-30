@@ -39,7 +39,7 @@ impl Pattern<'_> {
                 }
                 pos += 1;
             }
-            println!("Reached end of input and not end of pattern. Remaining all wildcards: {}", !non_wildcards);
+            println!("Reached end of input ({}) and not end of pattern ({}). Remaining all wildcards: {}", self.input_pos, self.pattern_pos, !non_wildcards);
             return !non_wildcards;
         }
 
@@ -123,11 +123,15 @@ impl Pattern<'_> {
         } else if pattern_c != input_c {
             if pattern_c == '?' {
                 //if we are here, the prev pattern char - the optional - was matched, so we just ignore and advance
+                println!("Detected ? with prev match, just advance");
+                self.input_pos -= 1; //hold the input, skip just the pattern char
                 return self.advance(input_line, match_end);
             }
             else if self.pattern_pos < self.pattern.chars().count() - 1 && self.pattern.chars().nth(self.pattern_pos + 1).unwrap() == '?' {
                 // for the case abc? -> abdv where the prev optional was not matched
+                println!("Detected ? with non-prev match, skip & advance");
                 self.pattern_pos += 1; //skip the unmatched optional char and the "?" but the additional increment is in advance
+                self.input_pos -= 1; //hold the input, skip just the pattern char
                 return self.advance(input_line, match_end);
             }
             else {
@@ -166,6 +170,7 @@ fn match_pattern(input_line: &str, pattern_str: &str) -> bool {
         while start < input_line.chars().count() && ! matched {
             let input = &input_line.to_string()[start..];
             pattern.reset();
+            println!();
             println!("Trying to match string '{}' with pattern '{}'", input, pattern_str);
             matched = pattern.match_string(input, match_end);
             if match_start {
