@@ -21,7 +21,7 @@ fn word_matcher(input_line: &str) -> bool {
 }
 
 fn positive_char_group_matcher(input_line: &str, pattern: &str)  -> bool {
-    let group = &pattern[1..input_line.len()-1];
+    let group = &pattern[1..pattern.len()-1];
     for gc in group.chars() {
         if input_line.contains(gc) {
             println!("{} is in {}", gc, input_line);
