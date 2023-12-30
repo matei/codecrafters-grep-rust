@@ -10,12 +10,6 @@ struct Pattern<'a> {
 
 impl Pattern<'_> {
     fn advance(&mut self, input_line: &str, match_end: bool) -> bool {
-        // if self.pattern_pos >= self.pattern.chars().count() {
-        //     return true;
-        // }
-        // if self.input_pos >= input_line.chars().count() {
-        //     return false;
-        // }
         self.pattern_pos += 1;
         self.input_pos += 1;
         return self.match_string(input_line, match_end);
@@ -28,20 +22,12 @@ impl Pattern<'_> {
 
     fn match_string(&mut self, input_line: &str, match_end: bool) -> bool {
         //check for $ condition
-        // println!("{} {}", self.input_pos, self.pattern_pos);
         if match_end && self.input_pos < input_line.chars().count() && self.pattern_pos >= self.pattern.chars().count() {
             return false;
         }
 
-        if self.pattern_pos >= self.pattern.chars().count() {
-            return if match_end && self.input_pos < input_line.chars().count() - 1 {
-                false
-            } else {
-                true
-            }
-        }
         if self.input_pos >= input_line.chars().count() && self.pattern_pos < self.pattern.chars().count() {
-            println!("Reached end of input and not end of matcher");
+            println!("Reached end of input and not end of pattern");
             return false;
         }
         if self.pattern.chars().nth(self.pattern_pos).unwrap() == '\\' {
