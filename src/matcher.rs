@@ -60,6 +60,9 @@ impl<'a> Pattern<'a> {
             input_pos += to_advance;
             pattern_pos += 1;
         }
+        if pattern_pos < self.matchers.len() { // means we finished input without matching the entire pattern
+            return false;
+        }
         return true;
     }
 }
