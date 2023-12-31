@@ -42,6 +42,7 @@ impl<'a> Pattern<'a> {
                 return false;
             }
             start_index += 1;
+            print_debug("", self.debug);
         }
         return false;
     }
@@ -212,7 +213,9 @@ impl<'a> Matcher<'a> {
             },
             Self::EndOfString => {
                 // cats cat$
-                (pos >= input.chars().count() - 1, 1)
+                let result = pos >= input.chars().count();
+                print_debug(&format!("Match {} $ at position {}", result, pos), debug);
+                (result, 1)
             },
             Self::WildCard => {
                 match input.chars().nth(pos) {
