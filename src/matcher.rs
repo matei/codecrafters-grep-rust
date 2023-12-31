@@ -28,15 +28,17 @@ impl<'a> Pattern<'a> {
     }
 
     pub fn test(&self, input: &str) -> bool {
+        print_debug(&format!("Start pattern match for {} against {}", self.pattern_str, input), self.debug);
         if self.matchers.len() == 0 {
             return true;
         }
         let mut start_index = 0;
-        while start_index < input.chars().count() - 1 {
+        while start_index < input.chars().count() {
             if self.do_test(&input[start_index..]) {
                 return true;
             }
             if self.start_modifier {
+                print_debug("No match for entire input and start modifier was requested", self.debug);
                 return false;
             }
             start_index += 1;

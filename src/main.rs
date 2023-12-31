@@ -23,7 +23,7 @@ fn main() {
     let pattern_matcher = Pattern::new(&pattern, true);
     dbg!(&pattern_matcher);
 
-    if pattern_matcher.test(&input_line) {
+    if pattern_matcher.test(&input_line.trim()) {
         println!("Match!");
         process::exit(0)
     } else {
