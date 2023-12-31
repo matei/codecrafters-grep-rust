@@ -1,3 +1,5 @@
+use crate::matcher::Matcher::Association;
+
 #[derive(Debug)]
 pub struct Pattern<'a> {
     matchers: Vec<Matcher<'a>>,
@@ -27,36 +29,37 @@ impl<'a> Pattern<'a> {
         Self {matchers, pattern_str: input, start_modifier: start_with, debug}
     }
 
-    pub fn test(&self, input: &str) -> bool {
+    pub fn test(&self, input: &str) -> (bool, usize) {
         print_debug(&format!("Start pattern match for {} against {}", self.pattern_str, input), self.debug);
         if self.matchers.len() == 0 {
-            return true;
+            return (true, 0);
         }
         let mut start_index = 0;
         while start_index < input.chars().count() {
-            if self.do_test(&input[start_index..]) {
-                return true;
+            let (result, matched_size) = self.do_test(&input[start_index..]);
+            if  result {
+                return (true, matched_size);
             }
             if self.start_modifier {
                 print_debug("No match for entire input and start modifier was requested", self.debug);
-                return false;
+                return (false, 0);
             }
             start_index += 1;
             print_debug("", self.debug);
         }
-        return false;
+        return (false, 0);
     }
 
-    fn do_test(&self, input: &str) -> bool {
+    fn do_test(&self, input: &str) -> (bool, usize) {
         let mut input_pos = 0;
         let mut pattern_pos = 0;
 
-        print_debug(&format!("Testing {} against {}", input, self.pattern_str), self.debug);
+        print_debug(&format!("Testing '{}' against '{}'", input, self.pattern_str), self.debug);
 
         while input_pos < input.chars().count() && pattern_pos < self.matchers.len() {
             let (result, to_advance) = self.matchers[pattern_pos].test(input, input_pos, self.debug);
             if !result {
-                return false;
+                return (false, 0);
             }
             input_pos += to_advance;
             pattern_pos += 1;
@@ -71,10 +74,10 @@ impl<'a> Pattern<'a> {
             }
             if has_non_wildcards {
                 print_debug("Finished input but not pattern", self.debug);
-                return false;
+                return (false, 0);
             }
         }
-        return true;
+        return (true, input_pos);
     }
 }
 #[derive(Debug, PartialEq)]
@@ -89,7 +92,8 @@ enum Matcher<'a> {
     WildCard,
     OneOrMore(char),
     ZeroOrOne(char),
-    Skip
+    Skip,
+    Association(Vec<String>)
 }
 
 impl<'a> Matcher<'a> {
@@ -137,7 +141,15 @@ impl<'a> Matcher<'a> {
                     panic!("Unclosed [");
                 }
             },
+            Some('(') => {
+                if let Some(closing_p) = find_closing(input, ')', pos) {
+                    return (Association(input[pos + 1..closing_p].split("|").map(|s| s.to_string()).collect()), closing_p - pos);
+                } else {
+                    panic!("Unclosed (");
+                }
+            }
             Some(']') => (Self::Skip, 0),
+            Some(')') => (Self::Skip, 0),
             Some(c) => {
                 match input.chars().nth(pos + 1) {
                     Some('+') => (Self::OneOrMore(c), 1),
@@ -270,6 +282,21 @@ impl<'a> Matcher<'a> {
                     }
                 }
             },
+            Self::Association(parts) => {
+                for sub_pattern in parts {
+                    let sub_input = &input[pos..].to_string();
+                    let sub_pattern_matcher = Pattern::new(sub_pattern, debug);
+                    let (result, to_advance) = sub_pattern_matcher.test(&sub_input);
+                    if result {
+                        print_debug(&format!("Match true subpattern {} from association group with {} characters at position {}", sub_pattern, to_advance, pos), debug);
+                        return (true, to_advance);
+                    } else {
+                        print_debug(&format!("Match false subpattern {} from association group at position {}", sub_pattern, pos), debug);
+                    }
+                }
+                print_debug(&format!("Match false entire association group at position {}",  pos), debug);
+                (false, 1)
+            }
             Self::Skip => {
                 print_debug(&format!("Skip at position {}", pos), debug);
                 (true, 0)
