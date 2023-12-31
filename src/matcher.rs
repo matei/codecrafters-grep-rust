@@ -61,12 +61,22 @@ impl<'a> Pattern<'a> {
             pattern_pos += 1;
         }
         if pattern_pos < self.matchers.len() { // means we finished input without matching the entire pattern
-            return false;
+            let mut has_non_wildcards = false;
+            while pattern_pos < self.matchers.len() && !has_non_wildcards {
+                if ![Matcher::Skip, Matcher::ZeroOrOne(input.chars().last().unwrap()), Matcher::EndOfString].contains(&self.matchers[pattern_pos]) {
+                    has_non_wildcards = true;
+                }
+                pattern_pos += 1;
+            }
+            if has_non_wildcards {
+                print_debug("Finished input but not pattern", self.debug);
+                return false;
+            }
         }
         return true;
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Matcher<'a> {
     Literal(char),
     Digit,
