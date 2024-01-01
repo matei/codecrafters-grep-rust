@@ -24,7 +24,12 @@ impl<'a> Pattern<'a> {
             }
             let (matcher, skip_s) = Matcher::new(&input, i);
             skip = skip_s;
-            matchers.push(matcher);
+            match matcher {
+                Matcher::Skip => {}
+                _ => {
+                    matchers.push(matcher);
+                }
+            }
         }
         Self {matchers, pattern_str: input, start_modifier: start_with, debug}
     }
@@ -67,8 +72,11 @@ impl<'a> Pattern<'a> {
         if pattern_pos < self.matchers.len() { // means we finished input without matching the entire pattern
             let mut has_non_wildcards = false;
             while pattern_pos < self.matchers.len() && !has_non_wildcards {
-                if ![Matcher::Skip, Matcher::ZeroOrOne(input.chars().last().unwrap()), Matcher::EndOfString].contains(&self.matchers[pattern_pos]) {
-                    has_non_wildcards = true;
+                match &self.matchers[pattern_pos] {
+                    Matcher::Skip | Matcher::ZeroOrOne(_) | Matcher::EndOfString  => {
+                        has_non_wildcards = true;
+                    }
+                    _ => ()
                 }
                 pattern_pos += 1;
             }
@@ -90,21 +98,22 @@ enum Matcher<'a> {
     StartOfString,
     EndOfString,
     WildCard,
-    OneOrMore(char),
-    ZeroOrOne(char),
+    OneOrMore(Box<Matcher<'a>>),
+    ZeroOrOne(Box<Matcher<'a>>),
     Skip,
     Association(Vec<String>)
 }
 
 impl<'a> Matcher<'a> {
     pub fn new(input: &'a str, pos: usize) -> (Self, usize) {
-        match input.chars().nth(pos) {
+        let mut result: (Matcher, usize); // here is where the language breaks down...
+        result = match input.chars().nth(pos) {
             Some('^') => {
                 (Self::StartOfString, 0)
-            },
+            }
             Some('$') => {
                 (Self::EndOfString, 0)
-            },
+            }
             Some('\\') => {
                 match input.chars().nth(pos + 1) {
                     Some('d') => {
@@ -123,43 +132,53 @@ impl<'a> Matcher<'a> {
                         panic!("Unterminated escape sequence")
                     }
                 }
-            },
+            }
             Some('+') => {
-                (Self::Skip, 0) //handled in generic Some(c) - normally we shouldn't reach this
-            },
-            Some('?') => (Self::Skip, 0), //handled in generic Some(c) - normally we shouldn't reach this
+                (Self::Skip, 0) //handled in lookahead below - normally we shouldn't reach this
+            }
+            Some('?') => (Self::Skip, 0), //handled in lookahead below - normally we shouldn't reach this
             Some('.') => (Self::WildCard, 0),
             Some('[') => {
                 if let Some(closing_bracket) = find_closing(input, ']', pos) {
-                    match input.chars().nth(pos + 1) {
+                    result = match input.chars().nth(pos + 1) {
                         Some('^') => (Self::GroupNegative(&input[pos + 2..closing_bracket]), closing_bracket - pos),
                         Some(_) => (Self::GroupPositive(&input[pos + 1..closing_bracket]), closing_bracket - pos),
                         None => panic!("This cannot happen")
-                    }
+                    };
                 }
                 else {
                     panic!("Unclosed [");
                 }
-            },
+                result
+            }
             Some('(') => {
                 if let Some(closing_p) = find_closing(input, ')', pos) {
-                    return (Association(input[pos + 1..closing_p].split("|").map(|s| s.to_string()).collect()), closing_p - pos);
+                    result = (Association(input[pos + 1..closing_p].split("|").map(|s| s.to_string()).collect()), closing_p - pos);
                 } else {
                     panic!("Unclosed (");
                 }
+                result
             }
             Some(']') => (Self::Skip, 0),
             Some(')') => (Self::Skip, 0),
-            Some(c) => {
-                match input.chars().nth(pos + 1) {
-                    Some('+') => (Self::OneOrMore(c), 1),
-                    Some('?') => (Self::ZeroOrOne(c), 1),
-                    Some(_) => (Self::Literal(c), 0),
-                    None => (Self::Literal(c), 0)
-                }
+            Some(c) => (Self::Literal(c), 0),
+            None => panic!("Could not compile pattern"),
+        };
+
+        //lookahead for quantifiers
+        let (matcher, skip) = result;
+        match input.chars().nth(pos + skip + 1) {
+            Some('+') => {
+                return (Self::OneOrMore(Box::new(matcher)), skip + 1);
             },
-            None => panic!("Could not compile pattern")
+            Some('?') => {
+                return (Self::ZeroOrOne(Box::new(matcher)), skip + 1);
+            }
+            Some(_) => (),
+            None => ()
         }
+
+        return (matcher, skip);
     }
 
     fn test(&self, input: &str, pos: usize, debug: bool) -> (bool, usize) {
@@ -173,7 +192,7 @@ impl<'a> Matcher<'a> {
                     },
                     None => (false, 0)
                 }
-            },
+            }
             Self::Digit => {
                 match input.chars().nth(pos) {
                     Some(c) => {
@@ -183,7 +202,7 @@ impl<'a> Matcher<'a> {
                     },
                     None => (false, 0)
                 }
-            },
+            }
             Self::Word => {
                 match input.chars().nth(pos) {
                     Some(c) => {
@@ -196,7 +215,7 @@ impl<'a> Matcher<'a> {
                         (false, 0)
                     }
                 }
-            },
+            }
             Self::GroupPositive(group) => {
                 match input.chars().nth(pos) {
                     Some(c) => {
@@ -209,7 +228,7 @@ impl<'a> Matcher<'a> {
                         (false, 0)
                     }
                 }
-            },
+            }
             Self::GroupNegative(group) => {
                 match input.chars().nth(pos) {
                     Some(c) => {
@@ -222,13 +241,13 @@ impl<'a> Matcher<'a> {
                         (false, 0)
                     }
                 }
-            },
+            }
             Self::EndOfString => {
                 // cats cat$
                 let result = pos >= input.chars().count();
                 print_debug(&format!("Match {} $ at position {}", result, pos), debug);
                 (result, 1)
-            },
+            }
             Self::WildCard => {
                 match input.chars().nth(pos) {
                     Some(c) => {
@@ -240,48 +259,58 @@ impl<'a> Matcher<'a> {
                         (false, 0)
                     }
                 }
-            },
+            }
             Self::OneOrMore(pc) => {
                 let mut matched = 0;
                 return match input.chars().nth(pos) {
-                    Some(c) => {
-                        if &c != pc {
-                            print_debug(&format!("Match false for {}+ with {}", pc, c), debug);
-                            return (false, 1)
+                    Some(_) => {
+                        let (result, advance) = pc.test(&input, pos, debug);
+                        if result {
+                            matched += advance;
+                            while pos + matched < input.chars().count() {
+                                let (result, advance) = pc.test(&input, pos + matched, debug);
+                                if result {
+                                    matched += advance;
+                                }
+                                else {
+                                    break;
+                                }
+                            }
                         }
-                        let mut search_pos = pos;
-                        while search_pos < input.chars().count() && &input.chars().nth(search_pos).unwrap() == pc {
-                            search_pos += 1;
-                            matched += 1;
+                        return if matched == 0 {
+                            print_debug(&format!("Match false {:?}+", *pc),  debug);
+                            (false, 1)
+                        } else {
+                            print_debug(&format!("Match true {:?}+ {} times", *pc, matched), debug);
+                            (true, matched)
                         }
-                        print_debug(&format!("Match true {}+ with {}x{}", pc, matched, pc), debug);
-                        (true, matched)
                     },
                     None => {
-                        print_debug(&format!("No match for {}+ at position {}", pc, pos), debug);
+                        print_debug(&format!("No match for {:?}+ at position {}", *pc, pos), debug);
                         (false, 0)
                     }
                 }
-            },
+            }
             Self::ZeroOrOne(pc) => {
                 //doa?g - dog
                 match input.chars().nth(pos) {
                     Some(c) => {
-                        if pc == &c {
-                            print_debug(&format!("Optional match true {}? with {} ", pc, c), debug);
-                            (true, 1)
+                        let (result, advance) = pc.test(&input, pos, debug);
+                        if result {
+                            print_debug(&format!("Optional match true {:?}? with {} ", *pc, c), debug);
+                            (true, advance)
                         }
                         else {
-                            print_debug(&format!("Optional match false {}? with {} ", pc, c), debug);
+                            print_debug(&format!("Optional match false {:?}? with {} ", *pc, c), debug);
                             (true, 0)
                         }
                     },
                     None => {
-                        print_debug(&format!("Optional match false {}? at end of input ", pc), debug);
+                        print_debug(&format!("Optional match false {:?}? at end of input ", *pc), debug);
                         (true, 0)
                     }
                 }
-            },
+            }
             Self::Association(parts) => {
                 for sub_pattern in parts {
                     let sub_input = &input[pos..].to_string();
