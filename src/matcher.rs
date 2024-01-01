@@ -70,13 +70,15 @@ impl<'a> Pattern<'a> {
             pattern_pos += 1;
         }
         if pattern_pos < self.matchers.len() { // means we finished input without matching the entire pattern
+            print_debug("Finished pattern early, checking for ending wildcards...", self.debug);
             let mut has_non_wildcards = false;
             while pattern_pos < self.matchers.len() && !has_non_wildcards {
+                print_debug(&format!("Check {:?}", self.matchers[pattern_pos]), self.debug);
                 match &self.matchers[pattern_pos] {
-                    Matcher::Skip | Matcher::ZeroOrOne(_) | Matcher::EndOfString  => {
+                    Matcher::Skip | Matcher::ZeroOrOne(_) | Matcher::EndOfString  => (),
+                    _ => {
                         has_non_wildcards = true;
                     }
-                    _ => ()
                 }
                 pattern_pos += 1;
             }
@@ -84,6 +86,7 @@ impl<'a> Pattern<'a> {
                 print_debug("Finished input but not pattern", self.debug);
                 return (false, 0);
             }
+            print_debug("No non-wildcards found", self.debug);
         }
         return (true, input_pos);
     }
