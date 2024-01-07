@@ -20,7 +20,7 @@ fn main() {
 
     io::stdin().read_line(&mut input_line).unwrap();
 
-    let pattern_matcher = Pattern::new(&pattern, true);
+    let mut pattern_matcher = Pattern::new(&pattern, true);
     dbg!(&pattern_matcher);
 
     let (result, _) = pattern_matcher.test(&input_line.trim());

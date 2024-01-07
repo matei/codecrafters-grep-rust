@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use crate::matcher::Matcher::Association;
 
 #[derive(Debug)]
 pub struct Pattern<'a> {
     matchers: Vec<Matcher<'a>>,
+    backrefs: HashMap<u32, String>,
     start_modifier: bool,
     pattern_str: &'a str,
     debug: bool
@@ -11,6 +13,7 @@ pub struct Pattern<'a> {
 impl<'a> Pattern<'a> {
     pub fn new(input: &'a str, debug: bool) -> Self {
         let mut matchers: Vec<Matcher> = Vec::new();
+        let mut backrefs: HashMap<u32, String> = HashMap::new();
         let mut skip = 0;
         let start_with = input.chars().nth(0).unwrap_or('a') == '^';
 
@@ -31,10 +34,10 @@ impl<'a> Pattern<'a> {
                 }
             }
         }
-        Self {matchers, pattern_str: input, start_modifier: start_with, debug}
+        Self {matchers, backrefs, pattern_str: input, start_modifier: start_with, debug}
     }
 
-    pub fn test(&self, input: &str) -> (bool, usize) {
+    pub fn test(&mut self, input: &str) -> (bool, usize) {
         print_debug(&format!("Start pattern match for {} against {}", self.pattern_str, input), self.debug);
         if self.matchers.len() == 0 {
             return (true, 0);
@@ -55,17 +58,26 @@ impl<'a> Pattern<'a> {
         return (false, 0);
     }
 
-    fn do_test(&self, input: &str) -> (bool, usize) {
+    fn do_test(&mut self, input: &str) -> (bool, usize) {
         let mut input_pos = 0;
         let mut pattern_pos = 0;
+        self.backrefs.clear();
+        let mut backref_count = 1;
 
         print_debug(&format!("Testing '{}' against '{}'", input, self.pattern_str), self.debug);
 
         while input_pos < input.chars().count() && pattern_pos < self.matchers.len() {
-            let (result, to_advance) = self.matchers[pattern_pos].test(input, input_pos, self.debug);
+            let (result, to_advance) = self.matchers[pattern_pos].test(input, input_pos, &self.backrefs, self.debug);
             if !result {
                 return (false, 0);
             }
+            match self.matchers[pattern_pos] {
+                Matcher::Association(_) => {
+                    self.backrefs.insert(backref_count, String::from(&input[input_pos..input_pos + to_advance]));
+                    backref_count += 1;
+                },
+                _ => {}
+            };
             input_pos += to_advance;
             pattern_pos += 1;
         }
@@ -104,7 +116,8 @@ enum Matcher<'a> {
     OneOrMore(Box<Matcher<'a>>),
     ZeroOrOne(Box<Matcher<'a>>),
     Skip,
-    Association(Vec<String>)
+    Association(Vec<String>),
+    Backref(u32)
 }
 
 impl<'a> Matcher<'a> {
@@ -128,6 +141,15 @@ impl<'a> Matcher<'a> {
                     Some('\\') => {
                         (Self::Literal('\\'), 1)
                     },
+                    Some(c) if c.is_digit(10) => {
+                        let mut a = 1;
+                        let mut s = String::new();
+                        while pos + a < input.chars().count() && input.chars().nth(pos + a).unwrap().is_digit(10) {
+                            s.push(input.chars().nth(pos + a).unwrap());
+                            a += 1;
+                        }
+                        (Self::Backref(s.parse().unwrap()), a)
+                    }
                     Some(_) => {
                         panic!("Unrecognized escape sequence")
                     },
@@ -143,16 +165,15 @@ impl<'a> Matcher<'a> {
             Some('.') => (Self::WildCard, 0),
             Some('[') => {
                 if let Some(closing_bracket) = find_closing(input, ']', pos) {
-                    result = match input.chars().nth(pos + 1) {
+                    match input.chars().nth(pos + 1) {
                         Some('^') => (Self::GroupNegative(&input[pos + 2..closing_bracket]), closing_bracket - pos),
                         Some(_) => (Self::GroupPositive(&input[pos + 1..closing_bracket]), closing_bracket - pos),
                         None => panic!("This cannot happen")
-                    };
+                    }
                 }
                 else {
                     panic!("Unclosed [");
                 }
-                result
             }
             Some('(') => {
                 if let Some(closing_p) = find_closing(input, ')', pos) {
@@ -184,7 +205,7 @@ impl<'a> Matcher<'a> {
         return (matcher, skip);
     }
 
-    fn test(&self, input: &str, pos: usize, debug: bool) -> (bool, usize) {
+    fn test(&self, input: &str, pos: usize, backrefs_map: &HashMap<u32, String>, debug: bool) -> (bool, usize) {
         match self {
             Self::Literal(pc) => {
                 match input.chars().nth(pos) {
@@ -267,11 +288,11 @@ impl<'a> Matcher<'a> {
                 let mut matched = 0;
                 return match input.chars().nth(pos) {
                     Some(_) => {
-                        let (result, advance) = pc.test(&input, pos, debug);
+                        let (result, advance) = pc.test(&input, pos, &backrefs_map, debug);
                         if result {
                             matched += advance;
                             while pos + matched < input.chars().count() {
-                                let (result, advance) = pc.test(&input, pos + matched, debug);
+                                let (result, advance) = pc.test(&input, pos + matched, &backrefs_map, debug);
                                 if result {
                                     matched += advance;
                                 }
@@ -298,7 +319,7 @@ impl<'a> Matcher<'a> {
                 //doa?g - dog
                 match input.chars().nth(pos) {
                     Some(c) => {
-                        let (result, advance) = pc.test(&input, pos, debug);
+                        let (result, advance) = pc.test(&input, pos, &backrefs_map, debug);
                         if result {
                             print_debug(&format!("Optional match true {:?}? with {} ", *pc, c), debug);
                             (true, advance)
@@ -317,7 +338,7 @@ impl<'a> Matcher<'a> {
             Self::Association(parts) => {
                 for sub_pattern in parts {
                     let sub_input = &input[pos..].to_string();
-                    let sub_pattern_matcher = Pattern::new(sub_pattern, debug);
+                    let mut sub_pattern_matcher = Pattern::new(sub_pattern, debug);
                     let (result, to_advance) = sub_pattern_matcher.test(&sub_input);
                     if result {
                         print_debug(&format!("Match true subpattern {} from association group with {} characters at position {}", sub_pattern, to_advance, pos), debug);
@@ -328,7 +349,21 @@ impl<'a> Matcher<'a> {
                 }
                 print_debug(&format!("Match false entire association group at position {}",  pos), debug);
                 (false, 1)
-            }
+            },
+            Self::Backref(backref_pos) => {
+                if let Some(s) = backrefs_map.get(backref_pos) {
+                    let sub_input = &input[pos..].to_string();
+                    let mut sub_pattern_matcher = Pattern::new(s, debug);
+                    let (result, to_advance) = sub_pattern_matcher.test(&sub_input);
+                    if result {
+                        print_debug(&format!("Match true backref {}", s), debug);
+                        return (true, to_advance);
+                    } else {
+                        print_debug(&format!("Match false backref {}", s), debug);
+                    }
+                }
+                return (false, 1);
+            },
             Self::Skip => {
                 print_debug(&format!("Skip at position {}", pos), debug);
                 (true, 0)
