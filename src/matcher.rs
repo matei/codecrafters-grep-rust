@@ -211,7 +211,7 @@ impl<'a> Matcher<'a> {
                 match input.chars().nth(pos) {
                     Some(c) => {
                         let result = pc == &c;
-                        print_debug(&format!("Match {} {} with {}", result, pc, c), debug);
+                        print_debug(&format!("Match[Literal] {} {} with {}", result, pc, c), debug);
                         (result, 1)
                     },
                     None => (false, 0)
@@ -221,7 +221,7 @@ impl<'a> Matcher<'a> {
                 match input.chars().nth(pos) {
                     Some(c) => {
                         let result = c.is_digit(10);
-                        print_debug(&format!("Match {} \\d with {}", result, c), debug);
+                        print_debug(&format!("Match[Digit] true {} \\d with {}", result, c), debug);
                         (result, 1)
                     },
                     None => (false, 0)
@@ -231,11 +231,11 @@ impl<'a> Matcher<'a> {
                 match input.chars().nth(pos) {
                     Some(c) => {
                         let result = c.is_alphabetic() || c.is_digit(10);
-                        print_debug(&format!("Match {} \\w with {}", result, c), debug);
+                        print_debug(&format!("Match[Word] true {} \\w with {}", result, c), debug);
                         (result, 1)
                     },
                     None => {
-                        print_debug(&format!("No match for \\w at position {}",  pos), debug);
+                        print_debug(&format!("Match[Word] false for \\w at position {}",  pos), debug);
                         (false, 0)
                     }
                 }
@@ -244,11 +244,11 @@ impl<'a> Matcher<'a> {
                 match input.chars().nth(pos) {
                     Some(c) => {
                         let result = group.contains(c);
-                        print_debug(&format!("Match {} [{}] with {}", result, group, c), debug);
+                        print_debug(&format!("Match[GroupPositive] true {} [{}] with {}", result, group, c), debug);
                         (result, 1)
                     },
                     None => {
-                        print_debug(&format!("No match for [{}] at position {}", group, pos), debug);
+                        print_debug(&format!("Match[GroupPositive] false for [{}] at position {}", group, pos), debug);
                         (false, 0)
                     }
                 }
@@ -257,11 +257,11 @@ impl<'a> Matcher<'a> {
                 match input.chars().nth(pos) {
                     Some(c) => {
                         let result = !group.contains(c);
-                        print_debug(&format!("Match {} [^{}] with {}", result, group, c), debug);
+                        print_debug(&format!("Match[GroupNegative] true {} [^{}] with {}", result, group, c), debug);
                         (result, 1)
                     },
                     None => {
-                        print_debug(&format!("No match for [^{}] at position {}", group, pos), debug);
+                        print_debug(&format!("Match[GroupNegative] false for [^{}] at position {}", group, pos), debug);
                         (false, 0)
                     }
                 }
@@ -269,17 +269,17 @@ impl<'a> Matcher<'a> {
             Self::EndOfString => {
                 // cats cat$
                 let result = pos >= input.chars().count();
-                print_debug(&format!("Match {} $ at position {}", result, pos), debug);
+                print_debug(&format!("Match[EndOfString] true {} $ at position {}", result, pos), debug);
                 (result, 1)
             }
             Self::WildCard => {
                 match input.chars().nth(pos) {
                     Some(c) => {
-                        print_debug(&format!("Matched . with {}", c), debug);
+                        print_debug(&format!("Match[WildCard] true . with {}", c), debug);
                         (true, 1)
                     },
                     None => {
-                        print_debug(&format!("No match for . at position {}", pos), debug);
+                        print_debug(&format!("Match[WildCard] false for . at position {}", pos), debug);
                         (false, 0)
                     }
                 }
@@ -302,15 +302,15 @@ impl<'a> Matcher<'a> {
                             }
                         }
                         return if matched == 0 {
-                            print_debug(&format!("Match false {:?}+", *pc),  debug);
+                            print_debug(&format!("Match[OneOrMore] false {:?}+", *pc),  debug);
                             (false, 1)
                         } else {
-                            print_debug(&format!("Match true {:?}+ {} times", *pc, matched), debug);
+                            print_debug(&format!("Match[OneOrMore] true {:?}+ {} times", *pc, matched), debug);
                             (true, matched)
                         }
                     },
                     None => {
-                        print_debug(&format!("No match for {:?}+ at position {}", *pc, pos), debug);
+                        print_debug(&format!("Match[OneOrMore] false for {:?}+ at position {}", *pc, pos), debug);
                         (false, 0)
                     }
                 }
@@ -321,16 +321,16 @@ impl<'a> Matcher<'a> {
                     Some(c) => {
                         let (result, advance) = pc.test(&input, pos, &backrefs_map, debug);
                         if result {
-                            print_debug(&format!("Optional match true {:?}? with {} ", *pc, c), debug);
+                            print_debug(&format!("Match[ZeroOrOne] true {:?}? with {} ", *pc, c), debug);
                             (true, advance)
                         }
                         else {
-                            print_debug(&format!("Optional match false {:?}? with {} ", *pc, c), debug);
+                            print_debug(&format!("Match[ZeroOrOne] (Optional) false {:?}? with {} ", *pc, c), debug);
                             (true, 0)
                         }
                     },
                     None => {
-                        print_debug(&format!("Optional match false {:?}? at end of input ", *pc), debug);
+                        print_debug(&format!("Match[ZeroOrOne] (Optional) false {:?}? at end of input ", *pc), debug);
                         (true, 0)
                     }
                 }
@@ -341,13 +341,13 @@ impl<'a> Matcher<'a> {
                     let mut sub_pattern_matcher = Pattern::new(sub_pattern, debug);
                     let (result, to_advance) = sub_pattern_matcher.test(&sub_input);
                     if result {
-                        print_debug(&format!("Match true subpattern {} from association group with {} characters at position {}", sub_pattern, to_advance, pos), debug);
+                        print_debug(&format!("Match[Association] true subpattern {} from association group with {} characters at position {}", sub_pattern, to_advance, pos), debug);
                         return (true, to_advance);
                     } else {
-                        print_debug(&format!("Match false subpattern {} from association group at position {}", sub_pattern, pos), debug);
+                        print_debug(&format!("Match[Association] false subpattern {} from association group at position {}", sub_pattern, pos), debug);
                     }
                 }
-                print_debug(&format!("Match false entire association group at position {}",  pos), debug);
+                print_debug(&format!("Match[Association] false entire association group at position {}",  pos), debug);
                 (false, 1)
             },
             Self::Backref(backref_pos) => {
@@ -356,10 +356,10 @@ impl<'a> Matcher<'a> {
                     let mut sub_pattern_matcher = Pattern::new(s, debug);
                     let (result, to_advance) = sub_pattern_matcher.test(&sub_input);
                     if result {
-                        print_debug(&format!("Match true backref {}", s), debug);
-                        return (true, to_advance);
+                        print_debug(&format!("Match[Backref] true backref {}", s), debug);
+                        return (true, to_advance + 1);
                     } else {
-                        print_debug(&format!("Match false backref {}", s), debug);
+                        print_debug(&format!("Match[Backref] false backref {}", s), debug);
                     }
                 }
                 return (false, 1);
@@ -384,6 +384,6 @@ fn find_closing(input: &str, element: char, after: usize) -> Option<usize> {
 
 fn print_debug(message: &str, debug: bool) {
     if debug {
-        println!("{}", message);
+        debug!("{}", message);
     }
 }
