@@ -26,6 +26,7 @@ impl<'a> Pattern<'a> {
                 continue;
             }
             let (matcher, skip_s) = Matcher::new(&input, i);
+            // print_debug(&format!("instance {:?} skip_s is {}", matcher, skip_s), debug);
             skip = skip_s;
             match matcher {
                 Matcher::Skip => {}
@@ -148,7 +149,7 @@ impl<'a> Matcher<'a> {
                             s.push(input.chars().nth(pos + a).unwrap());
                             a += 1;
                         }
-                        (Self::Backref(s.parse().unwrap()), a)
+                        (Self::Backref(s.parse().unwrap()), a - 1)
                     }
                     Some(_) => {
                         panic!("Unrecognized escape sequence")
@@ -357,7 +358,7 @@ impl<'a> Matcher<'a> {
                     let (result, to_advance) = sub_pattern_matcher.test(&sub_input);
                     if result {
                         print_debug(&format!("Match[Backref] true backref {}", s), debug);
-                        return (true, to_advance + 1);
+                        return (true, to_advance);
                     } else {
                         print_debug(&format!("Match[Backref] false backref {}", s), debug);
                     }
